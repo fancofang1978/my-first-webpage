@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>函数绘图工具 | 动态数学可视化</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none; /* 提升拖动体验，但不会影响输入框 */
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(145deg, #f1f5f9 0%, #e4e9f0 100%);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            position: relative;
+        }
+
+        /* 主卡片容器 */
+        .graph-container {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            box-shadow: 0 25px 45px -12px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.05);
+            padding: 1.5rem;
+            width: fit-content;
+            max-width: 1300px;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            background: #ffffffdd;
+            backdrop-filter: blur(4px);
+            border-radius: 1.5rem;
+            padding: 1.2rem 1.8rem;
+            margin-bottom: 1.8rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 1rem;
+            justify-content: space-between;
+        }
+
+        .input-group {
+            flex: 3;
+            min-width: 220px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #1e293b;
+            margin-bottom: 0.4rem;
+        }
+
+        .equation-input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            font-size: 1rem;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+            background: #fefefe;
+            border: 1px solid #cbd5e1;
+            border-radius: 1.2rem;
+            transition: 0.2s;
+            box-shadow: inset 0 1px 2px #00000008, 0 1px 2px white;
+        }
+
+        .equation-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+
+        .range-group {
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            flex: 2;
+        }
+
+        .range-item {
+            flex: 1;
+            min-width: 85px;
+        }
+
+        .range-item input {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+            border-radius: 1rem;
+            border: 1px solid #cbd5e1;
+            background: #fefefe;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        button {
+            background: #1e293b;
+            border: none;
+            color: white;
+            padding: 0.7rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            letter-spacing: 0.3px;
+        }
+
+        button:hover {
+            background: #0f172a;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .examples {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            margin-top: 0.5rem;
+            align-items: center;
+        }
+
+        .example-badge {
+            background: #e2e8f0;
+            padding: 0.3rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            font-family: monospace;
+            cursor: pointer;
+            transition: 0.1s;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .example-badge:hover {
+            background: #cbd5e1;
+            transform: scale(0.97);
+        }
+
+        .error-msg {
+            color: #dc2626;
+            background: #fee2e2;
+            border-radius: 1.2rem;
+            padding: 0.4rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        /* canvas 区域 */
+        .canvas-wrapper {
+            background: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 12px 28px -8px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            overflow: auto;
+            padding: 0.5rem;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 0.8rem;
+            background: white;
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+        }
+
+        .info-bar {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            font-size: 0.8rem;
+            color: #334155;
+        }
+
+        .current-func {
+            background: #f1f5f9;
+            padding: 0.25rem 1rem;
+            border-radius: 2rem;
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        hr {
+            margin: 0.5rem 0;
+            border-color: #e2e8f0;
+        }
+
+        /* 右下角制作人水印 */
+        .credits {
+            position: fixed;
+            bottom: 16px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(6px);
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-family: 'Segoe UI', 'Inter', monospace;
+            letter-spacing: 0.5px;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: 0.2s;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .credits:hover {
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+        }
+
+        @media (max-width: 760px) {
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .range-group {
+                justify-content: space-between;
+            }
+            .graph-container {
+                padding: 1rem;
+            }
+            .credits {
+                bottom: 12px;
+                right: 12px;
+                font-size: 0.7rem;
+                padding: 4px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="graph-container">
+    <div class="control-panel">
+        <div class="input-group">
+            <label>📐 函数表达式 f(x) =</label>
+            <input type="text" id="functionInput" class="equation-input" placeholder="例如: x^2, sin(x), 2*x+1, exp(-x)*cos(x)" value="x^2">
+            <div class="examples">
+                <span>✨ 试试:</span>
+                <span class="example-badge" data-expr="x^2">x²</span>
+                <span class="example-badge" data-expr="sin(x)">sin(x)</span>
+                <span class="example-badge" data-expr="cos(x)">cos(x)</span>
+                <span class="example-badge" data-expr="x^3 - 2*x">x³-2x</span>
+                <span class="example-badge" data-expr="tan(x)">tan(x)</span>
+                <span class="example-badge" data-expr="exp(-x)*sin(3*x)">e⁻ˣ·sin3x</span>
+                <span class="example-badge" data-expr="sqrt(16-x^2)">√(16-x²)</span>
+            </div>
+        </div>
+        <div class="range-group">
+            <div class="range-item">
+                <label>Xmin</label>
+                <input type="number" id="xMin" value="-10" step="0.5">
+            </div>
+            <div class="range-item">
+                <label>Xmax</label>
+                <input type="number" id="xMax" value="10" step="0.5">
+            </div>
+            <div class="range-item">
+                <label>Ymin</label>
+                <input type="number" id="yMin" value="-10" step="0.5">
+            </div>
+            <div class="range-item">
+                <label>Ymax</label>
+                <input type="number" id="yMax" value="10" step="0.5">
+            </div>
+        </div>
+        <button id="plotBtn">📈 绘制图像</button>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="functionCanvas" width="900" height="600" style="width:100%; height:auto; max-width:900px; aspect-ratio:900/600"></canvas>
+    </div>
+
+    <div class="info-bar">
+        <div class="current-func" id="funcLabel">f(x) = x²</div>
+        <div id="errorMsg" style="color:#b91c1c; font-size:0.8rem;"></div>
+        <div>💡 提示: 支持 ^ 幂运算, sin, cos, tan, sqrt, abs, ln(log), exp, pi, e | 乘号用 *</div>
+    </div>
+</div>
+
+<!-- 右下角制作人信息 -->
+<div class="credits">
+    ✨ 制作人：方嘉棋
+</div>
+
+<script>
+    (function() {
+        // ---------- DOM 元素绑定 ----------
+        const canvas = document.getElementById('functionCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const functionInput = document.getElementById('functionInput');
+        const plotBtn = document.getElementById('plotBtn');
+        const xMinInput = document.getElementById('xMin');
+        const xMaxInput = document.getElementById('xMax');
+        const yMinInput = document.getElementById('yMin');
+        const yMaxInput = document.getElementById('yMax');
+        const funcLabelSpan = document.getElementById('funcLabel');
+        const errorMsgSpan = document.getElementById('errorMsg');
+        
+        // 固定画布真实尺寸 (物理像素)
+        let width = 900;
+        let height = 600;
+        canvas.width = width;
+        canvas.height = height;
+
+        // 坐标系变换参数 (动态)
+        let xMinWorld = -10, xMaxWorld = 10, yMinWorld = -10, yMaxWorld = 10;
+
+        // ---------- 辅助函数: 坐标映射 ----------
+        function worldToCanvas(x, y) {
+            const px = ((x - xMinWorld) / (xMaxWorld - xMinWorld)) * width;
+            const py = height - ((y - yMinWorld) / (yMaxWorld - yMinWorld)) * height;
+            return { x: px, y: py };
+        }
+
+        // 绘制网格 & 坐标轴 (带刻度和标签)
+        function drawGridAndAxes() {
+            if (!ctx) return;
+            ctx.save();
+            ctx.clearRect(0, 0, width, height);
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.fillStyle = "#334155";
+            ctx.font = "12px 'Segoe UI', 'Inter'";
+            ctx.lineWidth = 0.6;
+            
+            // 1. 绘制网格线 (根据范围动态计算间隔，美观)
+            const xRange = xMaxWorld - xMinWorld;
+            const yRange = yMaxWorld - yMinWorld;
+            
+            // 计算 x 轴步长: 期望大约 6~10 条网格线
+            let xStep = calculateNiceStep(xRange, 8);
+            let yStep = calculateNiceStep(yRange, 6);
+            
+            // 从第一个网格线开始
+            const startX = Math.ceil(xMinWorld / xStep) * xStep;
+            for (let x = startX; x <= xMaxWorld; x += xStep) {
+                const canvasPos = worldToCanvas(x, 0);
+                // 绘制竖线
+                const startPt = worldToCanvas(x, yMinWorld);
+                const endPt = worldToCanvas(x, yMaxWorld);
+                ctx.beginPath();
+                ctx.moveTo(startPt.x, startPt.y);
+                ctx.lineTo(endPt.x, endPt.y);
+                ctx.strokeStyle = "#e2e8f0";
+                ctx.stroke();
+                // 刻度标签
+                const labelPos = worldToCanvas(x, yMinWorld);
+                if (labelPos.x > 10 && labelPos.x < width - 10) {
+                    ctx.fillStyle = "#475569";
+                    ctx.fillText(formatNumber(x), labelPos.x - 8, labelPos.y + (yMinWorld > 0 ? -5 : 15));
+                }
+            }
+            
+            const startY = Math.ceil(yMinWorld / yStep) * yStep;
+            for (let y = startY; y <= yMaxWorld; y += yStep) {
+                const canvasPos = worldToCanvas(0, y);
+                const startPt = worldToCanvas(xMinWorld, y);
+                const endPt = worldToCanvas(xMaxWorld, y);
+                ctx.beginPath();
+                ctx.moveTo(startPt.x, startPt.y);
+                ctx.lineTo(endPt.x, endPt.y);
+                ctx.strokeStyle = "#e2e8f0";
+                ctx.stroke();
+                const labelPos = worldToCanvas(xMinWorld, y);
+                if (labelPos.y > 15 && labelPos.y < height - 5) {
+                    ctx.fillStyle = "#475569";
+                    ctx.fillText(formatNumber(y), labelPos.x + 5, labelPos.y - 3);
+                }
+            }
+            
+            // 2. 绘制 X, Y 轴 (粗线 + 箭头)
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#1e293b";
+            // X轴
+            const originXAxis = worldToCanvas(xMinWorld, 0);
+            const endXAxis = worldToCanvas(xMaxWorld, 0);
+            ctx.beginPath();
+            ctx.moveTo(originXAxis.x, originXAxis.y);
+            ctx.lineTo(endXAxis.x, endXAxis.y);
+            ctx.stroke();
+            // Y轴
+            const originYAxis = worldToCanvas(0, yMinWorld);
+            const endYAxis = worldToCanvas(0, yMaxWorld);
+            ctx.beginPath();
+            ctx.moveTo(originYAxis.x, originYAxis.y);
+            ctx.lineTo(endYAxis.x, endYAxis.y);
+            ctx.stroke();
+            
+            // 画箭头 (X轴)
+            drawArrowhead(worldToCanvas(xMaxWorld, 0).x, worldToCanvas(xMaxWorld, 0).y, 
+                          worldToCanvas(xMaxWorld - 0.3, 0).x, worldToCanvas(xMaxWorld - 0.3, 0).y);
+            // Y轴箭头
+            drawArrowhead(worldToCanvas(0, yMaxWorld).x, worldToCanvas(0, yMaxWorld).y,
+                          worldToCanvas(0, yMaxWorld - 0.3).x, worldToCanvas(0, yMaxWorld - 0.3).y);
+            
+            // 轴标签 X, Y
+            ctx.fillStyle = "#0f172a";
+            ctx.font = "bold 14px 'Segoe UI'";
+            const xLabelPos = worldToCanvas(xMaxWorld - 0.5, 0);
+            const yLabelPos = worldToCanvas(0, yMaxWorld - 0.5);
+            ctx.fillText("x", xLabelPos.x + 3, xLabelPos.y - 3);
+            ctx.fillText("y", yLabelPos.x + 5, yLabelPos.y - 3);
+            ctx.font = "12px 'Segoe UI'";
+            
+            // 原点标记 (如果原点在视图内)
+            if (0 >= xMinWorld && 0 <= xMaxWorld && 0 >= yMinWorld && 0 <= yMaxWorld) {
+                const originPt = worldToCanvas(0, 0);
+                ctx.fillStyle = "#1e293b";
+                ctx.beginPath();
+                ctx.arc(originPt.x, originPt.y, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = "#0f172a";
+                ctx.fill();
+                ctx.fillStyle = "#334155";
+                ctx.fillText("0", originPt.x + 5, originPt.y - 3);
+            }
+            ctx.restore();
+        }
+        
+        // 绘制箭头小函数
+        function drawArrowhead(toX, toY, fromX, fromY) {
+            ctx.save();
+            ctx.beginPath();
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            const arrowSize = 8;
+            const a1 = angle - Math.PI / 6;
+            const a2 = angle + Math.PI / 6;
+            const wingX1 = toX - arrowSize * Math.cos(a1);
+            const wingY1 = toY - arrowSize * Math.sin(a1);
+            const wingX2 = toX - arrowSize * Math.cos(a2);
+            const wingY2 = toY - arrowSize * Math.sin(a2);
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(wingX1, wingY1);
+            ctx.lineTo(wingX2, wingY2);
+            ctx.fillStyle = "#1e293b";
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        // 格式化刻度数字
+        function formatNumber(n) {
+            if (Math.abs(n) < 0.001) return "0";
+            if (Math.abs(n) >= 1e4) return n.toExponential(1);
+            return parseFloat(n.toFixed(4)).toString();
+        }
+        
+        // 计算 nice 步长
+        function calculateNiceStep(range, targetTicks) {
+            if (range <= 0) return 1;
+            let roughStep = range / targetTicks;
+            const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+            let residual = roughStep / magnitude;
+            let niceStep;
+            if (residual < 1.5) niceStep = 1 * magnitude;
+            else if (residual < 3.5) niceStep = 2 * magnitude;
+            else if (residual < 7) niceStep = 5 * magnitude;
+            else niceStep = 10 * magnitude;
+            return niceStep;
+        }
+        
+        // ---------- 核心: 解析方程并编译为函数 ----------
+        function compileFunction(exprStr) {
+            let clean = exprStr.trim();
+            if (clean === "") return null;
+            // 移除类似 "y=" 或 "f(x)=" 前缀，允许用户友好输入
+            if (clean.toLowerCase().startsWith("y=")) {
+                clean = clean.substring(2);
+            }
+            if (clean.toLowerCase().startsWith("f(x)=")) {
+                clean = clean.substring(5);
+            }
+            // 替换幂运算 ^ 为 **
+            clean = clean.replace(/\^/g, '**');
+            
+            // 替换数学函数名: 支持 Math 标准函数 + ln, log10 等
+            const funcMap = [
+                { regex: /\bsin\s*\(/g, replace: 'Math.sin(' },
+                { regex: /\bcos\s*\(/g, replace: 'Math.cos(' },
+                { regex: /\btan\s*\(/g, replace: 'Math.tan(' },
+                { regex: /\basin\s*\(/g, replace: 'Math.asin(' },
+                { regex: /\bacos\s*\(/g, replace: 'Math.acos(' },
+                { regex: /\batan\s*\(/g, replace: 'Math.atan(' },
+                { regex: /\bsinh\s*\(/g, replace: 'Math.sinh(' },
+                { regex: /\bcosh\s*\(/g, replace: 'Math.cosh(' },
+                { regex: /\btanh\s*\(/g, replace: 'Math.tanh(' },
+                { regex: /\bexp\s*\(/g, replace: 'Math.exp(' },
+                { regex: /\bsqrt\s*\(/g, replace: 'Math.sqrt(' },
+                { regex: /\babs\s*\(/g, replace: 'Math.abs(' },
+                { regex: /\bfloor\s*\(/g, replace: 'Math.floor(' },
+                { regex: /\bceil\s*\(/g, replace: 'Math.ceil(' },
+                { regex: /\blog10\s*\(/g, replace: 'Math.log10(' },
+                { regex: /\bln\s*\(/g, replace: 'Math.log(' },      // ln 自然对数
+                { regex: /\blog\s*\(/g, replace: 'Math.log10(' },   // log 默认以10为底，但也可保留自然对数，这里方便用log10
+            ];
+            // 注意: 针对 log 处理，如果用户想用自然对数可使用 ln，但log按常用对数处理，问题不大
+            // 更严谨：增加单独处理，但为了体验 log 提供为 Math.log10，也可再添加log自然对数变体，不过用户可切换
+            // 额外附加 'log' 自然对数冲突？添加自定义: 如果用户希望自然对数可用 "ln"
+            funcMap.forEach(({regex, replace}) => {
+                clean = clean.replace(regex, replace);
+            });
+            // 特殊常量 pi, e
+            clean = clean.replace(/\bpi\b/gi, 'Math.PI');
+            clean = clean.replace(/\be\b/g, 'Math.E');
+            
+            // 最后检查确保表达式安全, 尝试构造Function
+            try {
+                // 注意: 表达式里只能包含x变量，其他非法字符会抛出错误
+                const fn = new Function('x', 'with(Math) { return (' + clean + '); }');
+                return fn;
+            } catch (err) {
+                console.error(err);
+                return null;
+            }
+        }
+        
+        // 绘制函数曲线 (在每个像素级别采样 + 智能断点)
+        function drawFunctionCurve(f) {
+            if (typeof f !== 'function') return;
+            
+            const steps = width;           // 每个水平像素采样一次, 保证平滑
+            const deltaX = (xMaxWorld - xMinWorld) / steps;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = "#3b82f6";
+            ctx.shadowBlur = 0;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            
+            let lastValid = false;
+            let lastXCanvas = 0, lastYCanvas = 0;
+            let lastWorldX = 0, lastWorldY = 0;
+            const maxJumpPixels = 55;  // 跳跃阈值(像素)，tan函数断开连线
+            
+            for (let i = 0; i <= steps; i++) {
+                const worldX = xMinWorld + i * deltaX;
+                let worldY;
+                try {
+                    worldY = f(worldX);
+                    // 处理无效值 NaN, Infinity
+                    if (typeof worldY !== 'number' || !isFinite(worldY)) {
+                        throw new Error('Invalid Y');
+                    }
+                } catch (e) {
+                    // 计算错误则断开
+                    lastValid = false;
+                    continue;
+                }
+                
+                // 超出Y轴范围也视为不连续（曲线超出视图时避免异常连线）
+                if (worldY < yMinWorld || worldY > yMaxWorld) {
+                    lastValid = false;
+                    continue;
+                }
+                
+                const { x: canvasX, y: canvasY } = worldToCanvas(worldX, worldY);
+                // 边界保护: 如果canvas点完全超出画布但世界坐标在范围内, 理论上还在内部，我们仍绘制，但一般超出范围很少
+                if (canvasX < -50 || canvasX > width + 50 || canvasY < -50 || canvasY > height + 50) {
+                    lastValid = false;
+                    continue;
+                }
+                
+                if (!lastValid) {
+                    ctx.moveTo(canvasX, canvasY);
+                    lastValid = true;
+                    lastXCanvas = canvasX;
+                    lastYCanvas = canvasY;
+                    lastWorldX = worldX;
+                    lastWorldY = worldY;
+                    continue;
+                }
+                
+                // 检查跳跃: 两点距离(像素)太大则断开路径
+                const dxPixel = canvasX - lastXCanvas;
+                const dyPixel = canvasY - lastYCanvas;
+                const distance = Math.sqrt(dxPixel*dxPixel + dyPixel*dyPixel);
+                if (distance > maxJumpPixels) {
+                    // 断开路径，新起点
+                    ctx.beginPath();
+                    ctx.moveTo(canvasX, canvasY);
+                    lastXCanvas = canvasX;
+                    lastYCanvas = canvasY;
+                    lastWorldX = worldX;
+                    lastWorldY = worldY;
+                    continue;
+                }
+                
+                ctx.lineTo(canvasX, canvasY);
+                // 更新上次点
+                lastXCanvas = canvasX;
+                lastYCanvas = canvasY;
+                lastWorldX = worldX;
+                lastWorldY = worldY;
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        // ---------- 全局绘图流程 ----------
+        function renderGraph() {
+            // 获取范围
+            let xMin = parseFloat(xMinInput.value);
+            let xMax = parseFloat(xMaxInput.value);
+            let yMin = parseFloat(yMinInput.value);
+            let yMax = parseFloat(yMaxInput.value);
+            
+            // 验证范围合法性
+            if (isNaN(xMin)) xMin = -10;
+            if (isNaN(xMax)) xMax = 10;
+            if (isNaN(yMin)) yMin = -10;
+            if (isNaN(yMax)) yMax = 10;
+            if (xMin >= xMax) { [xMin, xMax] = [xMax, xMin]; }
+            if (yMin >= yMax) { [yMin, yMax] = [yMax, yMin]; }
+            
+            xMinWorld = xMin;
+            xMaxWorld = xMax;
+            yMinWorld = yMin;
+            yMaxWorld = yMax;
+            
+            // 同步回输入框 (格式化)
+            xMinInput.value = xMinWorld;
+            xMaxInput.value = xMaxWorld;
+            yMinInput.value = yMinWorld;
+            yMaxInput.value = yMaxWorld;
+            
+            // 获取方程表达式
+            let rawExpr = functionInput.value.trim();
+            if (rawExpr === "") {
+                errorMsgSpan.innerText = "⚠️ 请输入函数表达式";
+                drawGridAndAxes();
+                funcLabelSpan.innerText = "暂无函数";
+                return;
+            }
+            
+            // 显示简化表达式
+            let displayExpr = rawExpr;
+            if (displayExpr.toLowerCase().startsWith("y=")) displayExpr = displayExpr.substring(2);
+            if (displayExpr.toLowerCase().startsWith("f(x)=")) displayExpr = displayExpr.substring(5);
+            funcLabelSpan.innerText = `f(x) = ${displayExpr}`;
+            
+            // 编译函数
+            const compiledFunc = compileFunction(rawExpr);
+            if (!compiledFunc) {
+                errorMsgSpan.innerText = "❌ 表达式语法错误，请检查 (例如: sin(x)，乘号使用*，幂用^)";
+                drawGridAndAxes();
+                return;
+            }
+            
+            // 测试几个点确保快速验证
+            let testValid = false;
+            try {
+                let testVal = compiledFunc(0);
+                if (typeof testVal === 'number' && isFinite(testVal)) testValid = true;
+                else testValid = false;
+            } catch(e) { testValid = false; }
+            
+            if (!testValid) {
+                errorMsgSpan.innerText = "⚠️ 函数在当前定义域可能无法计算 (检查负数平方根或间断) 但仍尝试绘制";
+            } else {
+                errorMsgSpan.innerText = "";
+            }
+            
+            // 开始绘制: 网格 & 轴
+            drawGridAndAxes();
+            
+            // 绘制函数曲线
+            if (compiledFunc) {
+                try {
+                    drawFunctionCurve(compiledFunc);
+                } catch (err) {
+                    errorMsgSpan.innerText = "绘制时发生错误: " + err.message;
+                }
+            }
+        }
+        
+        // ---------- 辅助：示例按钮 & 事件绑定 ----------
+        function setupExampleButtons() {
+            const badges = document.querySelectorAll('.example-badge');
+            badges.forEach(badge => {
+                badge.addEventListener('click', (e) => {
+                    const expr = badge.getAttribute('data-expr');
+                    if (expr) {
+                        functionInput.value = expr;
+                        renderGraph();   // 点击示例自动绘图
+                    }
+                });
+            });
+        }
+        
+        // 监听窗口变化只是重绘保持比例？canvas尺寸固定，但若缩放无需重采样，表格不变
+        window.addEventListener('resize', () => {
+            // 为了避免大小变化引起模糊，canvas的尺寸固定为900x600，css自适应保留比例即可
+            // 无需额外操作，但重绘一下让视觉舒服
+            renderGraph();
+        });
+        
+        // 初始化 & 绑定按钮
+        plotBtn.addEventListener('click', () => {
+            renderGraph();
+        });
+        
+        // 按回车快速绘图
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                renderGraph();
+            }
+        }
+        functionInput.addEventListener('keypress', handleEnter);
+        // 范围输入enter支持
+        const rangeInputs = [xMinInput, xMaxInput, yMinInput, yMaxInput];
+        rangeInputs.forEach(inp => inp.addEventListener('keypress', handleEnter));
+        
+        // 启动默认绘图
+        setupExampleButtons();
+        renderGraph();
+    })();
+</script>
+</body>
+</html>
